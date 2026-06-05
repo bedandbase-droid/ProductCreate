@@ -226,18 +226,9 @@ if st.session_state.results:
                 item["bytes"],
                 use_container_width=True
             )
-            item["approved"] = st.checkbox(
-                "Approve",
-                value=item["approved"],
-                key=f"approve_{idx}"
-            )
 
-        with col2:
-            st.text_input(
-                "Filename",
-                value=item["filename"],
-                disabled=True,
-                key=f"file_{idx}"
+            st.markdown(
+                f"[Download Image]({generated_url})"
             )
             st.text_area(
                 "Alt Text",
