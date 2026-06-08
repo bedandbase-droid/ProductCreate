@@ -20,8 +20,9 @@ with st.sidebar:
     st.header("🔑 API Configuration")
     gemini_key = st.text_input(
         "Gemini API Key", 
-        value="AIzaSyDC_gg-ahyCGMtlNPknvPxDiEij8UAyS6k", 
-        type="password"
+        value="", 
+        type="password",
+        help="Enter your Gemini API key here."
     )
     
     st.header("🛍️ Shopify Connection")
