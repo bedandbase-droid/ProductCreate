@@ -1,4 +1,5 @@
 import streamlit as st
+from PIL import Image
 from google import genai
 from google.genai import types
 import json
@@ -25,13 +26,21 @@ with st.sidebar:
     
     st.header("🛍️ Shopify Connection")
     shopify_url = st.text_input("Shopify Store URL", value="that-couch-place.myshopify.com")
-    client_id = st.text_input("Shopify Client ID", value="8ea16b30d85ce8f2e530e4e70893a9b5")
+    shopify_api_key = st.text_input("Shopify API Key / Client Key", value="8ea16b30d85ce8f2e530e4e70893a9b5")
     
-    # Securely input your Client Secret (shpss_...) right inside the quotes below to save it
-    client_secret = st.text_input(
-        "Shopify Client Secret", 
-        value="", 
-        type="password"
+    # Securely input your Shopify API secret key
+    shopify_api_secret = st.text_input(
+        "Shopify API Secret / Client Secret",
+        value="",
+        type="password",
+        help="Enter your Shopify app secret for token exchange."
+    )
+    
+    shopify_access_token = st.text_input(
+        "Shopify Access Token (optional)",
+        value="",
+        type="password",
+        help="If you already have a valid store access token, paste it here to skip token exchange."
     )
 
 # ====================== MASTER FABRIC SWATCH GUIDE ======================
@@ -41,7 +50,7 @@ FABRIC_DATABASE = {
     "Poly Linen": ["Light Grey Fabric", "Black Fabric", "Cream Fabric", "Charcoal Fabric"],
     "PU Leather": ["Black PU", "Brown PU", "Cream PU"],
     "Velvet": ["Dark Grey Velvet", "Emerald Velvet", "Royal Blue Velvet", "Light Grey Velvet", "Pink Velvet", "Sky Blue Velvet", "Black Velvet", "Dark Pink Velvet"],
-    "Colour": ["Black", "Red", "White", "Grey"]
+    "Colour": ["Black", "Red", "White", "Grey", "Cream"]
 }
 
 COLLECTIONS = [
@@ -53,19 +62,20 @@ COLLECTIONS = [
 ]
 
 # Automated OAuth Client Credentials token exchange engine
-def get_automated_shopify_token(shop_url, c_id, c_secret):
+def get_automated_shopify_token(shop_url, api_key, api_secret):
     token_url = f"https://{shop_url}/admin/oauth/access_token"
     payload = {
-        "client_id": c_id,
-        "client_secret": c_secret,
+        "client_id": api_key,
+        "client_secret": api_secret,
         "grant_type": "client_credentials"
     }
+    headers = {"Content-Type": "application/json"}
     try:
-        response = requests.post(token_url, json=payload, timeout=10)
+        response = requests.post(token_url, json=payload, headers=headers, timeout=10)
         if response.status_code == 200:
             return response.json().get("access_token")
         return None
-    except:
+    except Exception:
         return None
 
 # ====================== MAIN FACTORY UI LAYOUT ======================
@@ -90,6 +100,15 @@ with col1:
         selected = st.multiselect(f"Colors for {fabric}", colors, default=colors[:2], key=f"colors_{fabric}")
         if selected:
             fabric_selections[fabric] = selected
+
+    st.subheader("Product Image Reference")
+    uploaded_image = st.file_uploader(
+        "Upload a product photo for AI reference",
+        type=["jpg", "jpeg", "png"],
+        help="Upload a photo the AI can use when generating the product description and SEO copy."
+    )
+    if uploaded_image:
+        st.image(Image.open(uploaded_image), caption="Uploaded product image", width=400)
 
     st.subheader("📏 Dimensions")
     use_ai_dimensions = st.toggle("Let Gemini auto-fill missing dimensions", value=True)
@@ -121,6 +140,8 @@ with col2:
             st.error("Gemini API Key is required")
         elif not fabric_selections:
             st.error("Please select at least one fabric and color choice.")
+        elif not uploaded_image:
+            st.error("Please upload a product image for AI reference.")
         else:
             with st.spinner("Compiling copy blueprint and analyzing sizing parameters..."):
                 try:
@@ -128,6 +149,7 @@ with col2:
                     variant_text = " | ".join(variant_summary)
 
                     dimensions_input = f"Total: {total_width}W x {total_depth}D x {total_height}H mm | Seat: {seat_width}x{seat_depth}x{seat_height}mm"
+                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was uploaded."
 
                     client = genai.Client(api_key=gemini_key)
 
@@ -139,6 +161,7 @@ with col2:
                     Construction: {core_material}
                     Comfort: {comfort_level}
                     Dimensions Given: {dimensions_input}
+                    Image Reference: {image_note}
 
                     SIZE ENFORCEMENT & SA MARKET COMPLIANCE:
                     If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output them clearly.
@@ -176,15 +199,18 @@ with col2:
     if st.button("🚀 Push to Shopify as Draft", type="secondary"):
         if not st.session_state.get('generated_product'):
             st.error("Please generate the product first before running the push engine!")
-        elif not client_secret:
-            st.error("Please enter your secure Shopify Client Secret in the sidebar parameter window.")
+        elif not shopify_access_token and not shopify_api_secret:
+            st.error("Please enter either a valid Shopify access token or your Shopify API secret.")
         else:
             with st.spinner("Exchanging OAuth keys and transmitting data packets directly into Shopify..."):
                 try:
-                    access_token = get_automated_shopify_token(shopify_url, client_id, client_secret)
+                    if shopify_access_token:
+                        access_token = shopify_access_token
+                    else:
+                        access_token = get_automated_shopify_token(shopify_url, shopify_api_key, shopify_api_secret)
                     
                     if not access_token:
-                        st.error("Shopify OAuth Authentication Failed. Verify credentials and store domain layout.")
+                        st.error("Shopify authentication failed. Verify your API key/secret or provide a valid access token.")
                     else:
                         product_data = st.session_state['generated_product']
 
