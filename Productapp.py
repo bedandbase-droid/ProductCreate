@@ -50,8 +50,8 @@ FABRIC_DATABASE = {
     "Buffalo Fabric": ["Light Buffalo", "Black Buffalo", "Cream Buffalo", "Dark Brown Buffalo", "Light Grey Buffalo", "Ox-Blood Buffalo"],
     "Poly Linen": ["Light Grey Fabric", "Black Fabric", "Cream Fabric", "Charcoal Fabric"],
     "PU Leather": ["Black PU", "Brown PU", "Cream PU"],
-    "Velvet": ["Dark Grey Velvet", "Emerald Velvet", "Royal Blue Velvet", "Light Grey Velvet", "Pink Velvet", "Sky Blue Velvet", "Black Velvet", "Dark Pink Velvet"],
-    "Colour": ["Black", "Red", "White", "Grey", "Cream"]
+    "Velvet": ["Dark Grey Velvet", "Emerald Velvet", "Royal Blue Velvet", "Light Grey Velvet", "Pink Velvet", "Sky Blue Velvet", "Black Velvet", "Dark Pink Velvet", "Cream Velvet"],
+    "Colour": ["Black", "Red", "White", "Grey", "Cream", "Clear"]
 }
 
 COLLECTIONS = [
@@ -131,7 +131,12 @@ with col1:
 
     st.subheader("Internal Construction")
     core_material = st.text_input("Internal Core / Frame Structure", value="Solid Pine Frame / High-density foam layers")
-    comfort_level = st.select_slider("Comfort Rating", ["Soft", "Medium", "Firm"], value="Medium")
+    comfort_level = st.selectbox(
+        "Comfort Rating (optional)",
+        options=["", "Soft", "Medium", "Firm"],
+        index=0,
+        help="Leave this blank if you do not want to specify a firmness level."
+    )
 
 with col2:
     st.header("2. Generate & Push Product")

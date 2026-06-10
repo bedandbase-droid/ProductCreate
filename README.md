@@ -1,26 +1,15 @@
 # 🛋️ Product Creation Suite
 
-Launch your AI tools directly from the badges below:
+Select a shortcut badge below to launch either app independently:
 
-[![Launch Fabric Studio (Images)](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/bedandbase-droid) 👈 **Click here to launch the Image Fabric Studio**
+[![Launch Text Studio](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/bedandbase-droid) 👈 **Click to open Website Text Generator (`Productapp.py`)**
+
+[![Launch Fabric Studio](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/bedandbase-droid) 👈 **Click to open Fabric AI Studio (`imagefabricapp.py`)**
 
 ---
 
-## 🛠️ App Directory
+## 🛠️ Local Development
 
-This repository contains two production workflows:
-
-### 1. 🎨 Furniture Fabric AI Studio (`imagefabricapp.py`)
-Generates realistic fabric variations onto couch images using your swatch library.
-* **To run locally:** `streamlit run imagefabricapp.py`
-
-### 2. 📝 Website Text Generator (`Productapp.py`)
-Handles copy, text assets, and content creation for your main website.
-* **To run locally:** `streamlit run Productapp.py`
-
-## 📦 Installation
-
-Before running either app locally, make sure your environment is setup:
-
+### 1. Installation
 ```bash
 pip install -r requirements.txt
