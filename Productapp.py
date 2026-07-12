@@ -63,6 +63,7 @@ COLLECTIONS = [
     "Ultimate U-Shape Couches Collection", "Specials: Limited Deals"
 ]
 
+# Comprehensive Google Product Categories Taxonomy
 GOOGLE_CATEGORIES = [
     "Furniture > Bedroom Furniture > Beds",
     "Furniture > Bedroom Furniture > Bed Frames",
@@ -74,12 +75,28 @@ GOOGLE_CATEGORIES = [
     "Furniture > Living Room Furniture > Sleeper Couches",
     "Furniture > Living Room Furniture > Chairs",
     "Furniture > Living Room Furniture > Recliners",
+    "Furniture > Living Room Furniture > Ottomans",
+    "Furniture > Living Room Furniture > Coffee Tables",
+    "Furniture > Living Room Furniture > End Tables",
+    "Furniture > Living Room Furniture > Console Tables",
+    "Furniture > Bedroom Furniture > Nightstands",
+    "Furniture > Bedroom Furniture > Dressers",
+    "Furniture > Bedroom Furniture > Wardrobes",
+    "Furniture > Dining Room Furniture > Dining Tables",
+    "Furniture > Dining Room Furniture > Dining Chairs",
+    "Furniture > Dining Room Furniture > Buffets",
     "Furniture > Office Furniture > Desks",
     "Furniture > Office Furniture > Office Chairs",
-    "Furniture > Tables > Dining Tables",
-    "Furniture > Tables > Coffee Tables",
-    "Furniture > Tables > Side Tables",
+    "Furniture > Office Furniture > Bookcases",
+    "Furniture > Office Furniture > Filing Cabinets",
+    "Furniture > Accent Furniture > Benches",
+    "Furniture > Accent Furniture > Stools",
+    "Furniture > Accent Furniture > Poufs",
+    "Furniture > Accent Furniture > Storage Benches",
     "Home & Garden > Furniture > Outdoor Furniture > Seating",
+    "Home & Garden > Furniture > Outdoor Furniture > Outdoor Couches",
+    "Home & Garden > Furniture > Outdoor Furniture > Outdoor Chairs",
+    "Home & Garden > Furniture > Outdoor Furniture > Outdoor Tables",
 ]
 
 # Automated OAuth Client Credentials token exchange engine
@@ -108,12 +125,36 @@ with col1:
     category = st.selectbox("Collection", COLLECTIONS)
     
     st.subheader("📂 Google Product Category")
-    google_category = st.selectbox(
-        "Select Google Category (for Shopify feed)",
-        options=GOOGLE_CATEGORIES,
-        index=5,
-        help="Choose the appropriate Google Merchant Center category for your product."
+    google_search = st.text_input(
+        "Search Google Categories",
+        placeholder="e.g., 'sofa', 'couch', 'bed', 'desk', 'chair'...",
+        help="Type keywords to search through Google Merchant Center categories. Leave empty to see all options."
     )
+    
+    # Filter categories based on search input
+    if google_search:
+        filtered_categories = [cat for cat in GOOGLE_CATEGORIES if google_search.lower() in cat.lower()]
+        if not filtered_categories:
+            st.warning(f"No categories found matching '{google_search}'. Here are some popular options:")
+            google_category = st.selectbox(
+                "Select from popular categories:",
+                options=["Furniture > Living Room Furniture > Couches",
+                        "Furniture > Bedroom Furniture > Beds",
+                        "Furniture > Dining Room Furniture > Dining Tables",
+                        "Furniture > Office Furniture > Desks"]
+            )
+        else:
+            google_category = st.selectbox(
+                f"Found {len(filtered_categories)} matching categories:",
+                options=filtered_categories
+            )
+    else:
+        google_category = st.selectbox(
+            "Or select from all categories (scroll to browse):",
+            options=GOOGLE_CATEGORIES,
+            index=4,
+            help="Choose the appropriate Google Merchant Center category for your product."
+        )
     
     st.subheader("Fabric Types & Colors")
     selected_fabric_types = st.multiselect(
