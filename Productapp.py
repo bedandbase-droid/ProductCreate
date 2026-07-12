@@ -69,6 +69,9 @@ GOOGLE_CATEGORIES = [
     "Furniture > Bedroom Furniture > Bed Frames",
     "Furniture > Bedroom Furniture > Mattresses",
     "Furniture > Bedroom Furniture > Mattress Toppers",
+    "Furniture > Bedroom Furniture > Nightstands",
+    "Furniture > Bedroom Furniture > Dressers",
+    "Furniture > Bedroom Furniture > Wardrobes",
     "Furniture > Living Room Furniture > Couches",
     "Furniture > Living Room Furniture > Sofas",
     "Furniture > Living Room Furniture > Sectional Sofas",
@@ -79,11 +82,9 @@ GOOGLE_CATEGORIES = [
     "Furniture > Living Room Furniture > Coffee Tables",
     "Furniture > Living Room Furniture > End Tables",
     "Furniture > Living Room Furniture > Console Tables",
-    "Furniture > Bedroom Furniture > Nightstands",
-    "Furniture > Bedroom Furniture > Dressers",
-    "Furniture > Bedroom Furniture > Wardrobes",
     "Furniture > Dining Room Furniture > Dining Tables",
     "Furniture > Dining Room Furniture > Dining Chairs",
+    "Furniture > Dining Room Furniture > Bar Chairs",
     "Furniture > Dining Room Furniture > Buffets",
     "Furniture > Office Furniture > Desks",
     "Furniture > Office Furniture > Office Chairs",
@@ -91,8 +92,13 @@ GOOGLE_CATEGORIES = [
     "Furniture > Office Furniture > Filing Cabinets",
     "Furniture > Accent Furniture > Benches",
     "Furniture > Accent Furniture > Stools",
+    "Furniture > Accent Furniture > Bar Stools",
     "Furniture > Accent Furniture > Poufs",
     "Furniture > Accent Furniture > Storage Benches",
+    "Furniture > Pet Furniture > Pet Beds",
+    "Furniture > Pet Furniture > Pet Couches",
+    "Furniture > Pet Furniture > Pet Chairs",
+    "Furniture > Pet Furniture > Pet Houses",
     "Home & Garden > Furniture > Outdoor Furniture > Seating",
     "Home & Garden > Furniture > Outdoor Furniture > Outdoor Couches",
     "Home & Garden > Furniture > Outdoor Furniture > Outdoor Chairs",
@@ -127,7 +133,7 @@ with col1:
     st.subheader("📂 Google Product Category")
     google_search = st.text_input(
         "Search Google Categories",
-        placeholder="e.g., 'sofa', 'couch', 'bed', 'desk', 'chair'...",
+        placeholder="e.g., 'sofa', 'couch', 'bed', 'desk', 'chair', 'pet', 'bar'...",
         help="Type keywords to search through Google Merchant Center categories. Leave empty to see all options."
     )
     
@@ -141,7 +147,8 @@ with col1:
                 options=["Furniture > Living Room Furniture > Couches",
                         "Furniture > Bedroom Furniture > Beds",
                         "Furniture > Dining Room Furniture > Dining Tables",
-                        "Furniture > Office Furniture > Desks"]
+                        "Furniture > Office Furniture > Desks",
+                        "Furniture > Pet Furniture > Pet Beds"]
             )
         else:
             google_category = st.selectbox(
@@ -152,7 +159,7 @@ with col1:
         google_category = st.selectbox(
             "Or select from all categories (scroll to browse):",
             options=GOOGLE_CATEGORIES,
-            index=4,
+            index=8,
             help="Choose the appropriate Google Merchant Center category for your product."
         )
     
