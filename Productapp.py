@@ -52,7 +52,7 @@ FABRIC_DATABASE = {
     "PU Leather": ["Black PU", "Brown PU", "Cream PU"],
     "Velvet": ["Dark Grey Velvet", "Emerald Velvet", "Royal Blue Velvet", "Light Grey Velvet", "Pink Velvet", "Sky Blue Velvet", "Black Velvet", "Dark Pink Velvet", "Cream Velvet"],
     "Ripstop Canvas": ["Grey Canvas", "Blue Canvas", "Brown Canvas", "Green Canvas"],
-    "Colour": ["Black", "Red", "White", "Grey", "Cream", "Clear", "Brown"]
+    "Colour": ["Black", "Red", "White", "Grey", "Cream", "Clear", "Brown", "Yellow", "Blue", "Orange", "Silver", "Gold"]
 }
 
 COLLECTIONS = [
@@ -156,7 +156,7 @@ with col2:
                     variant_text = " | ".join(variant_summary)
 
                     dimensions_input = f"Total: {total_width}W x {total_depth}D x {total_height}H mm | Seat: {seat_width}x{seat_depth}x{seat_height}mm"
-                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was uploaded."
+                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was uploaded[...]
 
                     client = genai.Client(api_key=gemini_key)
 
@@ -171,7 +171,7 @@ with col2:
                     Image Reference: {image_note}
 
                     SIZE ENFORCEMENT & SA MARKET COMPLIANCE:
-                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output the inferred dimensions.
+                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output th[...]
                     Note: For South African bedding layouts, explicitly map the standard 3/4 bed base size (1070mm wide) alongside conventional dimensions metrics.
 
                     Return ONLY a clean, valid JSON dictionary with these exact keys. Do not wrap in markdown code fences:
