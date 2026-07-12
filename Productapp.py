@@ -63,6 +63,25 @@ COLLECTIONS = [
     "Ultimate U-Shape Couches Collection", "Specials: Limited Deals"
 ]
 
+GOOGLE_CATEGORIES = [
+    "Furniture > Bedroom Furniture > Beds",
+    "Furniture > Bedroom Furniture > Bed Frames",
+    "Furniture > Bedroom Furniture > Mattresses",
+    "Furniture > Bedroom Furniture > Mattress Toppers",
+    "Furniture > Living Room Furniture > Couches",
+    "Furniture > Living Room Furniture > Sofas",
+    "Furniture > Living Room Furniture > Sectional Sofas",
+    "Furniture > Living Room Furniture > Sleeper Couches",
+    "Furniture > Living Room Furniture > Chairs",
+    "Furniture > Living Room Furniture > Recliners",
+    "Furniture > Office Furniture > Desks",
+    "Furniture > Office Furniture > Office Chairs",
+    "Furniture > Tables > Dining Tables",
+    "Furniture > Tables > Coffee Tables",
+    "Furniture > Tables > Side Tables",
+    "Home & Garden > Furniture > Outdoor Furniture > Seating",
+]
+
 # Automated OAuth Client Credentials token exchange engine
 def get_automated_shopify_token(shop_url, api_key, api_secret):
     token_url = f"https://{shop_url}/admin/oauth/access_token"
@@ -87,6 +106,14 @@ with col1:
     st.header("1. Product Configuration")
     product_base_name = st.text_input("Product Base Name", value="Chesterfield Couch")
     category = st.selectbox("Collection", COLLECTIONS)
+    
+    st.subheader("📂 Google Product Category")
+    google_category = st.selectbox(
+        "Select Google Category (for Shopify feed)",
+        options=GOOGLE_CATEGORIES,
+        index=5,
+        help="Choose the appropriate Google Merchant Center category for your product."
+    )
     
     st.subheader("Fabric Types & Colors")
     selected_fabric_types = st.multiselect(
@@ -165,6 +192,7 @@ with col2:
                     
                     Product: {product_base_name}
                     Collection: {category}
+                    Google Category: {google_category}
                     Fabrics: {variant_text}
                     Construction: {core_material}
                     Comfort: {comfort_level}
@@ -197,6 +225,7 @@ with col2:
                         product_data = json.loads(json_match.group(0)) if json_match else {"title": "JSON Parse Failed"}
 
                     st.session_state['generated_product'] = product_data
+                    st.session_state['google_category'] = google_category
                     st.success("✅ Complete text template model computed successfully!")
 
                     st.subheader("Calculated SEO Title")
@@ -231,6 +260,7 @@ with col2:
                         st.error("Shopify authentication failed. Verify your API key/secret or provide a valid access token.")
                     else:
                         product_data = st.session_state['generated_product']
+                        google_cat = st.session_state.get('google_category', '')
 
                         shopify_payload = {
                             "product": {
@@ -253,6 +283,12 @@ with col2:
                                         "key": "title_tag",
                                         "value": product_data.get("meta_title", ""),
                                         "type": "string"
+                                    },
+                                    {
+                                        "namespace": "google",
+                                        "key": "product_category",
+                                        "value": google_cat,
+                                        "type": "string"
                                     }
                                 ]
                             }
@@ -269,6 +305,7 @@ with col2:
                         if resp.status_code == 201:
                             st.success(f"🎉 Success! '{product_base_name}' text listing has been pushed straight to your Shopify store dashboard as a Draft!")
                             st.success(f"Meta Description: {product_data.get('meta_description', 'N/A')}")
+                            st.success(f"Google Category: {google_cat}")
                             st.balloons()
                         else:
                             st.error(f"Shopify Core Error ({resp.status_code}): {resp.text}")
