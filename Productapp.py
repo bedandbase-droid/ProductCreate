@@ -156,12 +156,13 @@ with col2:
                     variant_text = " | ".join(variant_summary)
 
                     dimensions_input = f"Total: {total_width}W x {total_depth}D x {total_height}H mm | Seat: {seat_width}x{seat_depth}x{seat_height}mm"
-                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was uploaded[...]
+                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was uploaded"
 
                     client = genai.Client(api_key=gemini_key)
 
                     prompt = f"""
-                    You are an expert Shopify furniture copywriter. Create a premium commercial retail product listing description block.
+                    You are an expert Shopify furniture copywriter and SEO specialist. Create a premium commercial retail product listing with compelling, conversion-focused copy.
+                    
                     Product: {product_base_name}
                     Collection: {category}
                     Fabrics: {variant_text}
@@ -171,8 +172,16 @@ with col2:
                     Image Reference: {image_note}
 
                     SIZE ENFORCEMENT & SA MARKET COMPLIANCE:
-                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output th[...]
+                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output them.
                     Note: For South African bedding layouts, explicitly map the standard 3/4 bed base size (1070mm wide) alongside conventional dimensions metrics.
+
+                    META DESCRIPTION REQUIREMENTS:
+                    - Keep meta_description between 150-160 characters (critical for SEO)
+                    - Include primary keyword: {product_base_name}
+                    - Mention key fabric types and benefits
+                    - Include a compelling call-to-action element
+                    - Make it persuasive and click-worthy for search results
+                    Example format: "Premium [Product] in [Fabric]. [Key Feature]. [Benefit/Comfort]. Shop [Collection] for luxury [adjective] comfort."
 
                     Return ONLY a clean, valid JSON dictionary with these exact keys. Do not wrap in markdown code fences:
                     {{"title": "...", "handle": "...", "meta_title": "...", "meta_description": "...", "body_html": "...", "tags": ["tag1","tag2"]}}
@@ -193,7 +202,9 @@ with col2:
                     st.subheader("Calculated SEO Title")
                     st.success(product_data.get("title", "N/A"))
                     st.subheader("Meta Description Block")
-                    st.info(product_data.get("meta_description", "N/A"))
+                    meta_desc = product_data.get("meta_description", "N/A")
+                    char_count = len(meta_desc) if meta_desc != "N/A" else 0
+                    st.info(f"{meta_desc} ({char_count} characters)")
                     st.subheader("HTML Body Blueprint Preview")
                     st.markdown(product_data.get("body_html", "No content"))
 
@@ -229,7 +240,21 @@ with col2:
                                 "product_type": category,
                                 "status": "draft",
                                 "tags": ",".join(product_data.get("tags", [])),
-                                "handle": product_data.get("handle")
+                                "handle": product_data.get("handle"),
+                                "metafields": [
+                                    {
+                                        "namespace": "global",
+                                        "key": "description_tag",
+                                        "value": product_data.get("meta_description", ""),
+                                        "type": "string"
+                                    },
+                                    {
+                                        "namespace": "global",
+                                        "key": "title_tag",
+                                        "value": product_data.get("meta_title", ""),
+                                        "type": "string"
+                                    }
+                                ]
                             }
                         }
 
@@ -243,6 +268,7 @@ with col2:
 
                         if resp.status_code == 201:
                             st.success(f"🎉 Success! '{product_base_name}' text listing has been pushed straight to your Shopify store dashboard as a Draft!")
+                            st.success(f"Meta Description: {product_data.get('meta_description', 'N/A')}")
                             st.balloons()
                         else:
                             st.error(f"Shopify Core Error ({resp.status_code}): {resp.text}")
