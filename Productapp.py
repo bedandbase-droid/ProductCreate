@@ -55,15 +55,35 @@ FABRIC_DATABASE = {
     "Colour": ["Black", "Red", "White", "Grey", "Cream", "Clear", "Brown", "Yellow", "Blue", "Orange", "Silver", "Gold"]
 }
 
+# Replaced COLLECTIONS with detailed list (IDs, Titles, Products, Conditions)
 COLLECTIONS = [
-    "Cozy Corner Couches Collection", "Division Couches", "Lodge Collection",
-    "Tables and Chairs", "Mattress Toppers", "Newly Weds Collection",
-    "Office Furniture", "Sleeper Couches", "Student Collection",
-    "Toddler To Teen Collection", "Ultimate Bed & Mattresses Collection",
-    "Ultimate U-Shape Couches Collection", "Specials: Limited Deals"
+    {"id": "657001414977", "title": "Dining Tables and Consoles", "products": "7", "conditions": ""},
+    {"id": "86092939315", "title": "Cozy Corner Couches Collection", "products": "16", "conditions": ""},
+    {"id": "87063429171", "title": "Couches & Seating Sets: Sofas, Chairs, Lounge Suites - Modern furnishing solutions", "products": "42", "conditions": ""},
+    {"id": "159881658419", "title": "All Tables and Chairs", "products": "89", "conditions": ""},
+    {"id": "644949213505", "title": "Winter Collection", "products": "27", "conditions": "Tag includes winter comfort"},
+    {"id": "657002430785", "title": "Headboards and Bed Bases", "products": "3", "conditions": ""},
+    {"id": "657001185601", "title": "Kitchen Nook & Bar Chairs Modern – Stylish, Comfortable Seating", "products": "31", "conditions": ""},
+    {"id": "638433853761", "title": "Lodge Collection", "products": "28", "conditions": ""},
+    {"id": "476175401281", "title": "Student Collection", "products": "23", "conditions": "Title contains student\nType is equal to Student bed\nTag includes student"},
+    {"id": "474598342977", "title": "Toddler To Teen Collection", "products": "16", "conditions": ""},
+    {"id": "261479268403", "title": "Sleeper Couches", "products": "11", "conditions": ""},
+    {"id": "81365794867", "title": "Division Couches", "products": "20", "conditions": ""},
+    {"id": "81365401651", "title": "Ultimate Bed & Mattresses Collection", "products": "16", "conditions": ""},
+    {"id": "657001218369", "title": "Dining Tables, Glass, Marble, Wood, or Melamine", "products": "11", "conditions": ""},
+    {"id": "485588304193", "title": "Newly Weds Collection", "products": "6", "conditions": "Tag includes newly weds\nTitle contains Newly Weds"},
+    {"id": "657003413825", "title": "Occasional Chairs - Statement Pieces Collection – Furniture That Defines Your Space", "products": "10", "conditions": ""},
+    {"id": "657000988993", "title": "Dining Room Chairs", "products": "11", "conditions": ""},
+    {"id": "657003708737", "title": "Outdoor Furniture Collection – Patio, Garden & Balcony Sets", "products": "9", "conditions": ""},
+    {"id": "657002398017", "title": "Bedroom Tables and Chairs", "products": "25", "conditions": ""},
+    {"id": "633710444865", "title": "SOHO Furniture", "products": "23", "conditions": "Title contains office, office, +2 more\nTag includes office chair, office furniture, +1 more"},
+    {"id": "657002889537", "title": "Coffee Tables, Tv Stands and Consoles", "products": "19", "conditions": ""},
+    {"id": "86093070387", "title": "Ultimate U-Shape Couches Collection", "products": "3", "conditions": ""},
+    {"id": "657003577665", "title": "Pet Products", "products": "2", "conditions": ""},
+    {"id": "491328864577", "title": "Mattress Toppers", "products": "", "conditions": ""}
 ]
 
-# Comprehensive Google Product Categories Taxonomy
+# ====================== GOOGLE CATEGORIES ======================
 GOOGLE_CATEGORIES = [
     "Furniture > Bedroom Furniture > Beds",
     "Furniture > Bedroom Furniture > Bed Frames",
@@ -128,7 +148,18 @@ col1, col2 = st.columns([1, 1.2])
 with col1:
     st.header("1. Product Configuration")
     product_base_name = st.text_input("Product Base Name", value="Chesterfield Couch")
-    category = st.selectbox("Collection", COLLECTIONS)
+    
+    st.subheader("Collections")
+    # Allow multi-select of collections; map labels back to collection dicts
+    collection_labels = [f"{c['title']} ({c['id']})" for c in COLLECTIONS]
+    selected_collection_labels = st.multiselect(
+        "Select one or more Collections to assign this product to:",
+        options=collection_labels,
+        help="Select one or multiple collections to assign this product to when pushing to Shopify."
+    )
+    selected_collections = [next(c for c in COLLECTIONS if f"{c['title']} ({c['id']})" == lbl) for lbl in selected_collection_labels]
+    # Human readable display for prompts and previews
+    category_display = ", ".join([c['title'] for c in selected_collections]) if selected_collections else ""
     
     st.subheader("📂 Google Product Category")
     google_search = st.text_input(
@@ -231,15 +262,16 @@ with col2:
                     variant_text = " | ".join(variant_summary)
 
                     dimensions_input = f"Total: {total_width}W x {total_depth}D x {total_height}H mm | Seat: {seat_width}x{seat_depth}x{seat_height}mm"
-                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was uploaded"
+                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was upl[...]"
 
                     client = genai.Client(api_key=gemini_key)
 
+                    # Use category_display which may contain multiple selected collection titles
                     prompt = f"""
                     You are an expert Shopify furniture copywriter and SEO specialist. Create a premium commercial retail product listing with compelling, conversion-focused copy.
                     
                     Product: {product_base_name}
-                    Collection: {category}
+                    Collection: {category_display}
                     Google Category: {google_category}
                     Fabrics: {variant_text}
                     Construction: {core_material}
@@ -248,7 +280,7 @@ with col2:
                     Image Reference: {image_note}
 
                     SIZE ENFORCEMENT & SA MARKET COMPLIANCE:
-                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output them.
+                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output th[...]
                     Note: For South African bedding layouts, explicitly map the standard 3/4 bed base size (1070mm wide) alongside conventional dimensions metrics.
 
                     META DESCRIPTION REQUIREMENTS:
@@ -310,14 +342,25 @@ with col2:
                         product_data = st.session_state['generated_product']
                         google_cat = st.session_state.get('google_category', '')
 
+                        # Map selected collections for payloads
+                        collection_ids = [c['id'] for c in selected_collections]
+                        collection_titles = [c['title'] for c in selected_collections]
+
+                        # Use first selected collection as product_type if available, otherwise empty
+                        product_type_value = collection_titles[0] if len(collection_titles) >= 1 else ""
+
+                        # Merge tags from AI output and collection titles so product appears in tag searches
+                        base_tags = product_data.get("tags", []) if isinstance(product_data.get("tags", []), list) else []
+                        final_tags = base_tags + collection_titles
+
                         shopify_payload = {
                             "product": {
                                 "title": product_data.get("title"),
                                 "body_html": product_data.get("body_html"),
                                 "vendor": "That Couch Place",
-                                "product_type": category,
+                                "product_type": product_type_value,
                                 "status": "draft",
-                                "tags": ",".join(product_data.get("tags", [])),
+                                "tags": ",".join(final_tags),
                                 "handle": product_data.get("handle"),
                                 "metafields": [
                                     {
@@ -337,6 +380,18 @@ with col2:
                                         "key": "product_category",
                                         "value": google_cat,
                                         "type": "string"
+                                    },
+                                    {
+                                        "namespace": "shopify",
+                                        "key": "collection_ids",
+                                        "value": ",".join(collection_ids),
+                                        "type": "string"
+                                    },
+                                    {
+                                        "namespace": "shopify",
+                                        "key": "collection_titles",
+                                        "value": ",".join(collection_titles),
+                                        "type": "string"
                                     }
                                 ]
                             }
@@ -354,6 +409,8 @@ with col2:
                             st.success(f"🎉 Success! '{product_base_name}' text listing has been pushed straight to your Shopify store dashboard as a Draft!")
                             st.success(f"Meta Description: {product_data.get('meta_description', 'N/A')}")
                             st.success(f"Google Category: {google_cat}")
+                            if collection_titles:
+                                st.success(f"Assigned Collections: {', '.join(collection_titles)}")
                             st.balloons()
                         else:
                             st.error(f"Shopify Core Error ({resp.status_code}): {resp.text}")
