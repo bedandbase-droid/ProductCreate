@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from PIL import Image
 from google import genai
@@ -12,30 +13,37 @@ st.title("🛋️ AI Product Matrix & Text Studio")
 st.write("Generate complete, SEO-optimized Shopify product descriptions and technical data templates instantly.")
 st.markdown("---")
 
-if 'generated_product' not in st.session_state:
+if 'app_initialized' not in st.session_state:
+    st.session_state.clear()
+    st.session_state['app_initialized'] = True
     st.session_state['generated_product'] = {}
 
 # ====================== SIDEBAR CONFIGURATION ======================
 with st.sidebar:
     st.header("🔑 API Configuration")
-    gemini_key = st.text_input(
-        "Gemini API Key", 
-        value="", 
-        type="password",
-        help="Enter your Gemini API key here."
-    )
-    
+    gemini_key = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
+    shopify_api_secret = ""
+
+    # Safe parsing block to catch TOML formatting errors without crashing the app
+    try:
+        if not gemini_key:
+            if "gemini" in st.secrets:
+                gemini_key = st.secrets["gemini"].get("api_key", gemini_key)
+            elif "gemini_key" in st.secrets:
+                gemini_key = st.secrets["gemini_key"]
+            elif "GEMINI_KEY" in st.secrets:
+                gemini_key = st.secrets["GEMINI_KEY"]
+                
+        if "shopify" in st.secrets:
+            shopify_api_secret = st.secrets["shopify"].get("api_secret", "")
+        elif "SHOPIFY_API_SECRET" in st.secrets:
+            shopify_api_secret = st.secrets["SHOPIFY_API_SECRET"]
+    except Exception:
+        st.warning("⚠️ Could not read secrets.toml due to a formatting error. Please use the manual overrides in the main panel.")
+
     st.header("🛍️ Shopify Connection")
     shopify_url = st.text_input("Shopify Store URL", value="that-couch-place.myshopify.com")
-    shopify_api_key = st.text_input("Shopify API Key / Client Key", value="8ea16b30d85ce8f2e530e4e70893a9b5")
-    
-    # Securely input your Shopify API secret key
-    shopify_api_secret = st.text_input(
-        "Shopify API Secret / Client Secret",
-        value="",
-        type="password",
-        help="Enter your Shopify app secret for token exchange."
-    )
+    shopify_api_key = ""
     
     shopify_access_token = st.text_input(
         "Shopify Access Token (optional)",
@@ -147,7 +155,7 @@ col1, col2 = st.columns([1, 1.2])
 
 with col1:
     st.header("1. Product Configuration")
-    product_base_name = st.text_input("Product Base Name", value="Chesterfield Couch")
+    product_base_name = st.text_input("Product Base Name")
     
     st.subheader("Collections")
     # Allow multi-select of collections; map labels back to collection dicts
@@ -224,20 +232,20 @@ with col1:
     with st.expander("Enter Known Dimensions (mm)", expanded=True):
         col_a, col_b = st.columns(2)
         with col_a:
-            total_width = st.text_input("Total Width (mm)", value="2500")
-            seat_width = st.text_input("Seat Width (mm)", value="700")
-            chaise_width = st.text_input("Chaise Width (mm)", value="")
-            adjustable_from = st.text_input("Adjustable Height From (mm)", value="")
+            total_width = st.text_input("Total Width (mm)")
+            seat_width = st.text_input("Seat Width (mm)")
+            chaise_width = st.text_input("Chaise Width (mm)")
+            adjustable_from = st.text_input("Adjustable Height From (mm)")
         with col_b:
-            total_depth = st.text_input("Total Depth (mm)", value="950")
-            seat_depth = st.text_input("Seat Depth (mm)", value="700")
-            chaise_length = st.text_input("Chaise Length (mm)", value="")
-            adjustable_to = st.text_input("Adjustable Height To (mm)", value="")
-        total_height = st.text_input("Total Height (mm)", value="850")
-        seat_height = st.text_input("Seat Height (mm)", value="450")
+            total_depth = st.text_input("Total Depth (mm)")
+            seat_depth = st.text_input("Seat Depth (mm)")
+            chaise_length = st.text_input("Chaise Length (mm)")
+            adjustable_to = st.text_input("Adjustable Height To (mm)")
+        total_height = st.text_input("Total Height (mm)")
+        seat_height = st.text_input("Seat Height (mm)")
 
     st.subheader("Internal Construction")
-    core_material = st.text_input("Internal Core / Frame Structure", value="Solid Pine Frame / High-density foam layers")
+    core_material = st.text_input("Internal Core / Frame Structure")
     comfort_level = st.selectbox(
         "Comfort Rating (optional)",
         options=["", "Soft", "Medium", "Firm"],
@@ -247,6 +255,34 @@ with col1:
 
 with col2:
     st.header("2. Generate & Push Product")
+
+    st.subheader("Manual Credentials Override")
+    manual_gemini_key = st.text_input(
+        "Manual Gemini API Key (override)",
+        value="",
+        type="password",
+        help="Paste your Gemini API key here if automatic lookup fails."
+    )
+    if manual_gemini_key:
+        gemini_key = manual_gemini_key
+
+    manual_shopify_api_key = st.text_input(
+        "Manual Shopify API Key (override)",
+        value="",
+        type="password",
+        help="Paste your Shopify API key here if automatic lookup fails."
+    )
+    if manual_shopify_api_key:
+        shopify_api_key = manual_shopify_api_key
+
+    manual_shopify_api_secret = st.text_input(
+        "Manual Shopify API Secret (override)",
+        value="",
+        type="password",
+        help="Paste your Shopify API secret here if automatic lookup fails."
+    )
+    if manual_shopify_api_secret:
+        shopify_api_secret = manual_shopify_api_secret
 
     if st.button("✨ Generate Complete Shopify-Ready Product", type="primary"):
         if not gemini_key:
@@ -262,7 +298,7 @@ with col2:
                     variant_text = " | ".join(variant_summary)
 
                     dimensions_input = f"Total: {total_width}W x {total_depth}D x {total_height}H mm | Seat: {seat_width}x{seat_depth}x{seat_height}mm"
-                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was upl[...]
+                    image_note = f"Product image filename: {uploaded_image.name}. Use this visual reference when generating copy for the product." if uploaded_image else "No product image was uploaded."
 
                     client = genai.Client(api_key=gemini_key)
 
@@ -280,7 +316,7 @@ with col2:
                     Image Reference: {image_note}
 
                     SIZE ENFORCEMENT & SA MARKET COMPLIANCE:
-                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and outp[...]
+                    If use_ai_dimensions is True, check all fields. If any dimensions parameters above are blank, evaluate the item archetype, calculate standard industry specifications, and output a compliant set of alternative measurements based on the product category.
                     Note: For South African bedding layouts, explicitly map the standard 3/4 bed base size (1070mm wide) alongside conventional dimensions metrics.
 
                     META DESCRIPTION REQUIREMENTS:
@@ -361,39 +397,7 @@ with col2:
                                 "product_type": product_type_value,
                                 "status": "draft",
                                 "tags": ",".join(final_tags),
-                                "handle": product_data.get("handle"),
-                                "metafields": [
-                                    {
-                                        "namespace": "global",
-                                        "key": "description_tag",
-                                        "value": product_data.get("meta_description", ""),
-                                        "type": "string"
-                                    },
-                                    {
-                                        "namespace": "global",
-                                        "key": "title_tag",
-                                        "value": product_data.get("meta_title", ""),
-                                        "type": "string"
-                                    },
-                                    {
-                                        "namespace": "google",
-                                        "key": "product_category",
-                                        "value": google_cat,
-                                        "type": "string"
-                                    },
-                                    {
-                                        "namespace": "shopify",
-                                        "key": "collection_ids",
-                                        "value": ",".join(collection_ids),
-                                        "type": "string"
-                                    },
-                                    {
-                                        "namespace": "shopify",
-                                        "key": "collection_titles",
-                                        "value": ",".join(collection_titles),
-                                        "type": "string"
-                                    }
-                                ]
+                                "handle": product_data.get("handle")
                             }
                         }
 
