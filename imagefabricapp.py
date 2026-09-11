@@ -429,6 +429,10 @@ def sync_fabric_library(page_url):
 
 
 def load_fabric_library():
+    """
+    Load fabric library from fabric_library.json only.
+    Do NOT mix with legacy swatches folder to avoid duplicates.
+    """
     payload = read_json(LIBRARY_FILE, default={}) or {}
     entries = []
 
@@ -436,27 +440,6 @@ def load_fabric_library():
         path = SWATCH_DIR / item.get("filename", "")
         if path.exists():
             entries.append(item)
-
-    # Keep compatibility with the old app's manually maintained swatches folder.
-    known_files = {item.get("filename") for item in entries}
-    for path in sorted(SWATCH_DIR.iterdir()):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp"):
-            continue
-        if path.name in known_files:
-            continue
-
-        display_name = clean_display_name(path.name)
-        entries.append(
-            {
-                "name": display_name,
-                "category": infer_category_from_name(display_name),
-                "filename": path.name,
-                "source_url": None,
-                "synced_at": None,
-            }
-        )
 
     entries.sort(
         key=lambda item: (
