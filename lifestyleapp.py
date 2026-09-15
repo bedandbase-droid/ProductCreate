@@ -1,452 +1,286 @@
 import base64
+import io
 import os
-import threading
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+from datetime import datetime, timezone
 
+import requests
 import streamlit as st
 from openai import OpenAI
 from PIL import Image
 
+
 st.set_page_config(
-    page_title="That Couch Place Lifestyle Generator",
+    page_title="That Couch Place Lifestyle Studio",
     page_icon="🛋️",
     layout="wide",
 )
 
-# ============================================================
-# APP DATA
-# ============================================================
 
-STYLE_LIBRARY = {
-    "Bright Scandinavian": "Airy Scandinavian-inspired styling with light woods, pale neutrals, clean lines and restrained decor.",
-    "Warm Contemporary": "Comfortable contemporary styling with warm neutrals, tactile materials and welcoming modern decor.",
-    "Industrial Loft": "Urban industrial character with a balanced mix of raw and refined materials, large-scale architecture and modern decor.",
-    "Luxury Lodge": "Upscale lodge character with natural materials, generous proportions and a calm premium atmosphere.",
-    "Coastal Holiday": "Relaxed coastal holiday-home feeling with breezy finishes, soft natural textures and an easy indoor-outdoor mood.",
-    "Student / Compact Living": "Smart compact living with practical youthful styling, efficient use of space and bright modern finishes.",
-    "Hunting Lodge": "Rugged refined lodge character with timber, stone, leather-like textures and subtle hunting-country references.",
-    "Urban Penthouse": "Sophisticated high-end city apartment styling with contemporary finishes, generous glazing and polished decor.",
-    "Countryside Cottage": "Charming country-home character with natural textures, traditional touches and a comfortable lived-in feeling.",
-    "Japandi": "Calm Japandi direction combining Scandinavian simplicity with Japanese-inspired restraint and natural materials.",
-    "Mid-Century Modern": "Mid-century modern influence with clean geometry, warm wood, curated decor and a sophisticated residential feel.",
-    "Modern Farmhouse": "Modern farmhouse direction with natural timber, soft neutrals and simple architectural details.",
-    "Mediterranean": "Relaxed Mediterranean-inspired styling using warm plaster, stone, timber and sunny natural textures.",
-    "Art Deco": "Elegant Art Deco influence with confident geometry, refined materials and controlled glamour.",
-    "Boutique Hotel": "Curated boutique-hotel styling with layered textures, premium finishes and thoughtful decorative details.",
-    "Contemporary African": "Contemporary African-inspired styling using warm natural materials, crafted textures and earthy sophistication.",
-    "Minimal Luxury": "High-end minimalist styling with excellent materials, generous negative space and understated decor.",
-    "Tropical Resort": "Relaxed upscale tropical-resort character with natural materials, greenery and an indoor-outdoor feeling.",
-    "Rustic Modern": "A balanced mix of rustic natural materials and clean modern detailing.",
-    "Classic Elegant": "Timeless elegant styling with refined proportions, subtle traditional details and polished contemporary comfort.",
-    "Boho Eclectic": "Layered but tasteful bohemian styling with natural textures, collected decor and relaxed personality.",
-    "French Country": "Soft French-country influence with graceful shapes, warm natural materials and a comfortable residential feel.",
-    "Dark Modern": "Moody modern decor with deeper finishes and dramatic materials while keeping the furniture clearly visible.",
-    "Playful Modern": "Fresh modern styling with tasteful colour, playful forms and creative accessories.",
+ROOMS = {
+    "Lounge": "a welcoming residential lounge designed around the uploaded furniture",
+    "Family Room": "a comfortable, practical family room with tasteful everyday decor",
+    "TV Room": "a comfortable TV room with a discreet entertainment wall and relaxed styling",
+    "Entertainment Room": "a polished entertainment room suitable for hosting friends and family",
+    "Dining Room": "a well-proportioned dining room with an elegant but believable residential finish",
+    "Kitchen": "a bright contemporary kitchen with an appropriate dining or seating area",
+    "Bar": "a stylish upmarket bar interior with attractive ambient details",
+    "Restaurant": "a professionally designed restaurant interior with realistic table spacing",
+    "Hotel Room": "a refined hotel room or suite with uncluttered commercial styling",
+    "Kids Bedroom": "a cheerful, age-appropriate children's bedroom with safe practical decor",
+    "Bedroom": "a calm, inviting bedroom with balanced decor and comfortable proportions",
+    "Salon": "a polished modern beauty salon with a clean, welcoming atmosphere",
+    "Wedding Venue": "an elegant wedding venue with refined decor that does not obscure the furniture",
+    "Outdoor Area": "a realistic covered South African patio, veranda, garden or poolside setting",
 }
 
-ROOM_TYPES = [
-    "Lounge / Living Room",
-    "Family Room",
-    "TV Room",
-    "Entertainment Room",
-    "Dining Room",
-    "Kitchen",
-    "Bar",
-    "Restaurant",
-    "Hotel Room",
-    "Hotel Foyer / Lobby",
-    "Kids Bedroom",
-    "Main Bedroom",
-    "Salon",
-    "Office / Reception",
-    "Wedding Venue",
-    "Outdoor Area appropriate to the selected style",
-    "Custom",
-]
 
-SIZE_OPTIONS = {
-    "Square — Google Shopping friendly": "1024x1024",
-    "Landscape": "1536x1024",
-    "Portrait": "1024x1536",
+STYLES = {
+    "Auto-match the furniture": "Choose the room styling that best complements the uploaded furniture.",
+    "Bright Scandinavian": "Light oak, warm whites, restrained natural textures and an airy Scandinavian mood.",
+    "Cozy Contemporary": "Warm neutral tones, soft layered textures and relaxed contemporary decor.",
+    "Modern Minimalist": "Clean architectural lines, calm neutral colours and carefully selected minimal decor.",
+    "Industrial Loft": "Exposed brick or concrete, large windows, dark metal accents and softened industrial details.",
+    "Luxury Lodge": "High ceilings, natural timber and stone, open views and refined lodge styling.",
+    "Coastal Holiday Home": "Whitewashed or light floors, breezy textures, open doors and subtle coastal character.",
+    "Modern South African": "Warm contemporary South African home styling with natural materials and generous light.",
+    "Urban Apartment": "A realistic, well-designed compact apartment with space-conscious decor.",
+    "Student Living": "Bright, practical and affordable student accommodation with uncluttered styling.",
+    "Boutique Hotel": "Layered, sophisticated boutique-hotel decor with premium but believable finishes.",
+    "Classic Elegant": "Timeless proportions, elegant detailing and a sophisticated neutral palette.",
+    "Rustic Farmhouse": "Warm timber, tactile natural materials and relaxed contemporary farmhouse styling.",
 }
 
-QUALITY_OPTIONS = {
-    "Medium — draft": "medium",
-    "High — recommended": "high",
+
+CAMERAS = {
+    "Google Shopping / product focus": "Medium-wide ecommerce composition; furniture large, unobstructed and instantly readable at thumbnail size.",
+    "45-degree room view": "Natural 45-degree interior-photography angle showing the furniture and enough room context.",
+    "Straight-on elevation": "Mostly straight-on view with corrected verticals and a balanced symmetrical composition.",
+    "Wide interior": "Wide interior view while keeping the uploaded furniture prominent and clearly identifiable.",
+    "Editorial magazine": "Premium interior editorial composition with realistic professional photography.",
 }
 
-MODEL_OPTIONS = {
-    "GPT Image 2 — recommended": "gpt-image-2",
-    "GPT Image 1 — fallback": "gpt-image-1",
-}
 
-JOBS_DIR = Path("lifestyle_jobs")
-JOBS_DIR.mkdir(exist_ok=True)
+def slugify(value):
+    value = re.sub(r"[^a-zA-Z0-9]+", "-", value or "lifestyle-image")
+    return value.strip("-").lower() or "lifestyle-image"
 
 
-# ============================================================
-# BACKGROUND QUEUE
-# ============================================================
-
-class JobRuntime:
-    def __init__(self):
-        # Deliberately one worker: jobs queue safely instead of hitting the API in parallel.
-        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="lifestyle")
-        self.jobs = {}
-        self.lock = threading.RLock()
-
-    def set_job(self, job_id, **values):
-        with self.lock:
-            self.jobs.setdefault(job_id, {}).update(values)
-
-    def get_jobs(self, session_id):
-        with self.lock:
-            rows = [dict(v) for v in self.jobs.values() if v.get("session_id") == session_id]
-        return sorted(rows, key=lambda x: x.get("created", ""), reverse=True)
-
-
-@st.cache_resource
-def get_runtime():
-    return JobRuntime()
-
-
-runtime = get_runtime()
-
-if "lifestyle_session_id" not in st.session_state:
-    st.session_state.lifestyle_session_id = uuid.uuid4().hex
-
-SESSION_ID = st.session_state.lifestyle_session_id
-
-
-def get_api_key():
+def get_secret(name, default=""):
+    value = os.getenv(name, default)
+    if value:
+        return value
     try:
-        secret_key = st.secrets.get("OPENAI_API_KEY")
-        if secret_key:
-            return secret_key
+        return st.secrets.get(name, default)
     except Exception:
-        pass
-    return os.getenv("OPENAI_API_KEY")
+        return default
 
 
-def build_prompt(style_name, style_text, room_type, labels, extra):
-    refs = "\n".join(
-        f"- Reference image {i + 1}: {label or f'Furniture piece {i + 1}'}"
-        for i, label in enumerate(labels)
-    )
+def uploaded_bytes(upload):
+    upload.seek(0)
+    data = upload.read()
+    upload.seek(0)
+    return data
 
-    outdoor = ""
-    if room_type.startswith("Outdoor Area"):
-        outdoor = (
-            "For this outdoor option, interpret the selected style as a believable matching "
-            "patio, veranda, deck, courtyard, terrace, poolside or garden area. Choose what "
-            "fits naturally rather than forcing a specific outdoor setting."
+
+def build_prompt(product_name, room, style, camera, extra_instruction, image_count):
+    references = "The first uploaded image is the hero product."
+    if image_count > 1:
+        references += (
+            f" The remaining {image_count - 1} uploaded image(s) are supporting furniture pieces "
+            "that must also be included accurately in the same scene."
         )
 
-    extra_block = f"\nADDITIONAL USER DIRECTION:\n{extra.strip()}" if extra.strip() else ""
-
     return f"""
-Create a photorealistic commercial lifestyle photograph using the uploaded furniture reference images.
+Create one photorealistic furniture lifestyle image for That Couch Place.
 
-FURNITURE REFERENCES
-{refs}
+PRODUCT: {product_name or 'Use the uploaded furniture as the product reference.'}
+ROOM: {room} — {ROOMS[room]}
+STYLE: {style} — {STYLES[style]}
+CAMERA: {CAMERAS[camera]}
 
-PRIORITY 1 — PRESERVE THE UPLOADED FURNITURE
-The uploaded furniture images are identity references for the real products.
-Reproduce every uploaded furniture piece faithfully.
-Do not redesign, recolour, restyle or substitute any uploaded furniture.
-Keep the original silhouette, proportions, upholstery colour, fabric appearance, seams, piping,
-buttons, tufting, cushions, arms, headboards, bases, legs, feet, frames and other identifying details.
-If several furniture pieces are supplied, include all of them as separate real objects in one believable
-scene. Do not merge their designs or borrow features from one product for another.
-Only make the normal photographic adjustments needed to place them naturally into the room:
-perspective, scale, floor contact, realistic shadows and sensible overlap.
-Do not copy the original product-photo background.
+REFERENCE IMAGE RULES:
+- {references}
+- Preserve the exact identity and construction of every uploaded furniture piece.
+- Preserve shape, proportions, dimensions, upholstery colour and texture, seams, cushions, buttons, studs, arms, legs, headboard panels, table bases and all other distinguishing details.
+- Do not redesign, simplify, duplicate, merge or substitute any uploaded product.
+- You have creative freedom over the room architecture, decor and secondary accessories only.
+- Arrange the supplied pieces naturally together, with believable scale and perspective.
+- Do not place decor in front of, on top of, or across the main selling features of the furniture.
 
-PRIORITY 2 — CREATE THE ROOM FREELY
-Room type: {room_type}
-Style: {style_name}
-Style direction: {style_text}
+COMMERCIAL LIGHTING:
+- Use clean, bright, natural-looking professional interior lighting.
+- The furniture must remain clearly visible in a small Google Shopping thumbnail.
+- Retain realistic shadows, material texture and depth; avoid gloomy exposure, colour casts, blown highlights and dramatic darkness.
+- Produce a polished ecommerce photograph with no text, logos, borders, watermarks or people.
 
-Treat the style direction as inspiration, NOT a rigid checklist.
-You have creative freedom to invent the architecture, walls, floors, rugs, curtains, plants, art,
-lamps, tables, accessories and supporting decor. The room should look professionally styled and
-believable, and it may vary substantially from one generation to another.
-Supporting decor must complement the uploaded furniture, never cover it or visually overpower it.
-{outdoor}
-
-COMMERCIAL VISIBILITY
-The result must work even as a small Google Shopping-style thumbnail.
-Make the uploaded furniture the clear visual subject and large enough to recognise immediately.
-Use clean, bright, balanced photographic lighting. The room may still have mood and character,
-but do not underexpose the furniture, crush shadow detail, create strong colour casts on the product,
-or use dramatic darkness that hides fabric texture and construction detail.
-Keep important furniture surfaces well illuminated with believable natural light, soft fill light, or both.
-Maintain clear visual separation between furniture and background.
-
-FINAL IMAGE
-Professional photorealistic interior photography.
-Natural scale and perspective.
-Believable contact shadows.
-Sharp furniture detail.
-No people unless explicitly requested.
-No text, logos, labels or watermarks.
-No duplicate copies of an uploaded product unless explicitly requested.
-{extra_block}
+ADDITIONAL DIRECTION:
+{extra_instruction.strip() if extra_instruction.strip() else 'Use tasteful decor appropriate to the selected room and style.'}
 """.strip()
 
 
-def save_inputs(job_id, uploaded_files):
-    job_dir = JOBS_DIR / job_id
-    input_dir = job_dir / "inputs"
-    output_dir = job_dir / "outputs"
-    input_dir.mkdir(parents=True, exist_ok=True)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    paths = []
-    for index, uploaded in enumerate(uploaded_files, start=1):
-        suffix = Path(uploaded.name).suffix.lower()
-        if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
-            suffix = ".png"
-        path = input_dir / f"furniture_{index}{suffix}"
-        path.write_bytes(uploaded.getvalue())
-        paths.append(str(path))
-    return paths, output_dir
+@st.cache_resource
+def job_executor():
+    # Two workers allow one new request to be queued while another image is generating.
+    return ThreadPoolExecutor(max_workers=2, thread_name_prefix="lifestyle")
 
 
-def run_generation(job_id, api_key, input_paths, output_dir, prompt, model, quality, size):
-    runtime.set_job(job_id, status="Generating")
-    handles = []
-    try:
-        client = OpenAI(api_key=api_key)
-        handles = [open(path, "rb") for path in input_paths]
+def generate_image(api_key, prompt, reference_images, size, quality):
+    client = OpenAI(api_key=api_key)
+    files = []
+    for index, item in enumerate(reference_images, start=1):
+        buffer = io.BytesIO(item["data"])
+        buffer.name = item.get("name") or f"product-{index}.png"
+        files.append(buffer)
 
-        response = client.images.edit(
-            model=model,
-            image=handles,
-            prompt=prompt,
-            size=size,
-            quality=quality,
-            output_format="jpeg",
-        )
-
-        image_b64 = response.data[0].b64_json
-        if not image_b64:
-            raise RuntimeError("The image API returned no image data.")
-
-        image_bytes = base64.b64decode(image_b64)
-        output_path = Path(output_dir) / f"lifestyle_{job_id[:8]}.jpg"
-        output_path.write_bytes(image_bytes)
-        runtime.set_job(job_id, status="Complete", output_path=str(output_path))
-
-    except Exception as exc:
-        runtime.set_job(job_id, status="Failed", error=str(exc))
-    finally:
-        for handle in handles:
-            try:
-                handle.close()
-            except Exception:
-                pass
-
-
-def submit_job(api_key, uploaded_files, prompt, style_name, room_type, model, quality, size):
-    job_id = uuid.uuid4().hex
-    input_paths, output_dir = save_inputs(job_id, uploaded_files)
-
-    runtime.set_job(
-        job_id,
-        id=job_id,
-        session_id=SESSION_ID,
-        created=job_id,
-        status="Queued",
-        style=style_name,
-        room=room_type,
-        model=model,
-        quality=quality,
-        size=size,
+    response = client.images.edit(
+        model="gpt-image-1",
+        image=files,
         prompt=prompt,
-        output_path=None,
-        error=None,
+        input_fidelity="high",
+        size=size,
+        quality=quality,
+        n=1,
     )
 
-    runtime.executor.submit(
-        run_generation,
-        job_id,
-        api_key,
-        input_paths,
-        output_dir,
-        prompt,
-        model,
-        quality,
-        size,
+    result = response.data[0]
+    if getattr(result, "b64_json", None):
+        return base64.b64decode(result.b64_json)
+    if getattr(result, "url", None):
+        download = requests.get(result.url, timeout=90)
+        download.raise_for_status()
+        return download.content
+    raise RuntimeError("OpenAI returned no image data.")
+
+
+if "lifestyle_jobs" not in st.session_state:
+    st.session_state.lifestyle_jobs = []
+
+
+st.title("🛋️ That Couch Place Lifestyle Studio")
+st.caption("Combine up to three furniture pieces in a bright, sales-ready lifestyle scene.")
+
+with st.sidebar:
+    st.header("API configuration")
+    stored_api_key = get_secret("OPENAI_API_KEY")
+    manual_api_key = st.text_input(
+        "OpenAI API key",
+        type="password",
+        placeholder="Stored securely in Streamlit Secrets" if stored_api_key else "Enter your API key",
+        help="Add OPENAI_API_KEY to Streamlit Secrets to avoid entering it each time.",
     )
-    return job_id
+    api_key = manual_api_key or stored_api_key
+    st.divider()
+    st.write("Generation runs in the background. You can prepare and submit another scene while an earlier job continues.")
 
 
-# ============================================================
-# UI
-# ============================================================
+left, right = st.columns([1.05, 1], gap="large")
 
-st.title("🛋️ That Couch Place Lifestyle Generator")
-st.caption(
-    "Upload 1–3 furniture pieces. The furniture stays strict; the room decor stays creative. "
-    "Jobs generate one at a time in the background while you prepare the next scene."
-)
+with left:
+    st.subheader("1. Furniture")
+    product_name = st.text_input("Product or collection name", placeholder="Example: Oasis Serenity Dining Set")
+    hero = st.file_uploader("Main furniture image (required)", type=["jpg", "jpeg", "png", "webp"], key="hero")
+    supporting_1 = st.file_uploader("Second furniture piece (optional)", type=["jpg", "jpeg", "png", "webp"], key="support1")
+    supporting_2 = st.file_uploader("Third furniture piece (optional)", type=["jpg", "jpeg", "png", "webp"], key="support2")
 
-stored_api_key = get_api_key()
-manual_api_key = st.sidebar.text_input(
-    "OpenAI API Key",
-    type="password",
-    help="Leave blank when OPENAI_API_KEY is already saved in Streamlit secrets.",
-)
-api_key = manual_api_key.strip() or stored_api_key
+    previews = [item for item in (hero, supporting_1, supporting_2) if item]
+    if previews:
+        preview_columns = st.columns(len(previews))
+        for column, upload in zip(preview_columns, previews):
+            with column:
+                st.image(Image.open(upload), caption=upload.name, use_container_width=True)
 
-st.sidebar.subheader("Generation settings")
-model_label = st.sidebar.selectbox("Image model", list(MODEL_OPTIONS.keys()))
-model = MODEL_OPTIONS[model_label]
-quality_label = st.sidebar.selectbox("Quality", list(QUALITY_OPTIONS.keys()), index=1)
-quality = QUALITY_OPTIONS[quality_label]
-size_label = st.sidebar.selectbox("Image shape", list(SIZE_OPTIONS.keys()))
-size = SIZE_OPTIONS[size_label]
-st.sidebar.info("Safe queue: only one API image request runs at a time.")
+with right:
+    st.subheader("2. Scene")
+    room = st.selectbox("Room", list(ROOMS))
+    style = st.selectbox("Room style", list(STYLES))
+    camera = st.selectbox("Composition", list(CAMERAS))
+    extra_instruction = st.text_area(
+        "Extra instructions (optional)",
+        placeholder="Example: Keep the windows on the left and use a light neutral rug.",
+        height=100,
+    )
 
-st.subheader("1. Upload furniture")
-uploaded_files = st.file_uploader(
-    "Upload 1 to 3 furniture images",
-    type=["jpg", "jpeg", "png", "webp"],
-    accept_multiple_files=True,
-)
+    output_size_label = st.selectbox(
+        "Image shape",
+        ["Landscape (1536 × 1024)", "Square (1024 × 1024)", "Portrait (1024 × 1536)"],
+    )
+    size = {
+        "Landscape (1536 × 1024)": "1536x1024",
+        "Square (1024 × 1024)": "1024x1024",
+        "Portrait (1024 × 1536)": "1024x1536",
+    }[output_size_label]
+    quality = st.selectbox("Quality", ["medium", "high"], index=0)
 
-if len(uploaded_files) > 3:
-    st.error("Please upload a maximum of 3 furniture images.")
-
-labels = []
-if 1 <= len(uploaded_files) <= 3:
-    columns = st.columns(len(uploaded_files))
-    for index, (uploaded, column) in enumerate(zip(uploaded_files, columns)):
-        with column:
-            try:
-                st.image(Image.open(uploaded), use_container_width=True)
-            except Exception:
-                st.warning("Preview unavailable")
-            default_name = Path(uploaded.name).stem.replace("_", " ").replace("-", " ")
-            labels.append(
-                st.text_input(
-                    f"Furniture {index + 1} name / role",
-                    value=default_name,
-                    key=f"label_{index}",
-                )
+    if st.button("Generate lifestyle image", type="primary", use_container_width=True):
+        if not api_key:
+            st.error("Enter an OpenAI API key or add OPENAI_API_KEY to this app's Streamlit Secrets.")
+        elif not hero:
+            st.error("Upload the main furniture image first.")
+        else:
+            uploads = [item for item in (hero, supporting_1, supporting_2) if item]
+            references = [{"name": item.name, "data": uploaded_bytes(item)} for item in uploads]
+            prompt = build_prompt(product_name, room, style, camera, extra_instruction, len(references))
+            job_id = uuid.uuid4().hex[:8]
+            future = job_executor().submit(generate_image, api_key, prompt, references, size, quality)
+            st.session_state.lifestyle_jobs.insert(
+                0,
+                {
+                    "id": job_id,
+                    "name": product_name or "Lifestyle image",
+                    "created": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                    "prompt": prompt,
+                    "future": future,
+                    "status": "running",
+                },
             )
-
-st.subheader("2. Choose the room")
-room = st.selectbox("Room type", ROOM_TYPES)
-if room == "Custom":
-    room = st.text_input("Describe the room", placeholder="Example: rooftop cocktail lounge")
-
-st.subheader("3. Choose the room style")
-style_name = st.selectbox("Style", list(STYLE_LIBRARY.keys()) + ["Custom"])
-if style_name == "Custom":
-    style_text = st.text_area(
-        "Describe the style direction",
-        placeholder="Give a loose design direction. The AI will create the actual decor.",
-    )
-else:
-    style_text = STYLE_LIBRARY[style_name]
-    st.caption(style_text)
-
-st.subheader("4. Optional extra direction")
-extra = st.text_area(
-    "Extra instructions for this image",
-    placeholder=(
-        "Examples: Put the chair beside the couch. Use a garden view. "
-        "Make the room feel more premium. Do not include a coffee table."
-    ),
-    height=110,
-)
-
-valid_uploads = 1 <= len(uploaded_files) <= 3
-valid_setup = bool(room.strip()) and bool(style_text.strip())
-
-prompt = ""
-if valid_uploads and valid_setup:
-    prompt = build_prompt(style_name, style_text, room, labels, extra)
-    with st.expander("Preview generation prompt"):
-        st.text_area("Prompt", prompt, height=420, disabled=True, label_visibility="collapsed")
-
-if st.button(
-    "➕ Add image to background queue",
-    type="primary",
-    use_container_width=True,
-    disabled=not (api_key and valid_uploads and valid_setup),
-):
-    submit_job(api_key, uploaded_files, prompt, style_name, room, model, quality, size)
-    st.success(
-        "Added to the queue. You can immediately change the furniture, room, style or instructions "
-        "and prepare the next image while this one generates."
-    )
-
-if not api_key:
-    st.info("Enter your OpenAI API key in the sidebar, or save OPENAI_API_KEY in Streamlit secrets.")
+            st.success(f"Generation {job_id} started. You can now prepare another scene.")
 
 
-def render_queue():
-    jobs = runtime.get_jobs(SESSION_ID)
-    st.markdown("---")
-    st.subheader("Generation queue")
+st.divider()
+st.subheader("Generation queue")
 
+
+@st.fragment(run_every=4)
+def show_jobs():
+    jobs = st.session_state.lifestyle_jobs
     if not jobs:
-        st.caption("No images queued in this session yet.")
+        st.info("No generations submitted in this session yet.")
         return
 
-    queued = sum(job["status"] == "Queued" for job in jobs)
-    generating = sum(job["status"] == "Generating" for job in jobs)
-    complete = sum(job["status"] == "Complete" for job in jobs)
-    failed = sum(job["status"] == "Failed" for job in jobs)
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Queued", queued)
-    c2.metric("Generating", generating)
-    c3.metric("Complete", complete)
-    c4.metric("Failed", failed)
-
     for job in jobs:
-        with st.expander(f"{job['status']} — {job['style']} / {job['room']}", expanded=job["status"] in {"Generating", "Failed"}):
-            st.caption(f"Model: {job['model']} | Quality: {job['quality']} | Size: {job['size']}")
+        future = job.get("future")
+        if job["status"] == "running" and future.done():
+            try:
+                job["image"] = future.result()
+                job["status"] = "complete"
+            except Exception as error:
+                job["error"] = str(error)
+                job["status"] = "failed"
 
-            if job["status"] == "Generating":
-                st.info("Generating in the background. You can keep preparing the next scene above.")
-            elif job["status"] == "Failed":
-                st.error(job.get("error") or "Generation failed.")
-            elif job["status"] == "Complete":
-                output_path = job.get("output_path")
-                if output_path and Path(output_path).exists():
-                    image_bytes = Path(output_path).read_bytes()
-                    st.image(image_bytes, use_container_width=True)
-                    st.download_button(
-                        "Download image",
-                        image_bytes,
-                        file_name=Path(output_path).name,
-                        mime="image/jpeg",
-                        key=f"download_{job['id']}",
-                    )
+        with st.container(border=True):
+            title_col, status_col = st.columns([3, 1])
+            title_col.markdown(f"**{job['name']}**  \n{job['created']} · Job `{job['id']}`")
+            if job["status"] == "running":
+                status_col.info("Generating…")
+            elif job["status"] == "complete":
+                status_col.success("Complete")
+                st.image(job["image"], use_container_width=True)
+                st.download_button(
+                    "Download image",
+                    job["image"],
+                    file_name=f"{slugify(job['name'])}-{job['id']}.png",
+                    mime="image/png",
+                    key=f"download-{job['id']}",
+                )
+            else:
+                status_col.error("Failed")
+                st.error(job.get("error", "The image request failed."))
 
-            with st.expander("Prompt used"):
-                st.text(job["prompt"])
+            with st.expander("View the exact generation prompt"):
+                st.code(job["prompt"], language=None)
 
 
-if hasattr(st, "fragment"):
-    @st.fragment(run_every="3s")
-    def queue_fragment():
-        render_queue()
-
-    queue_fragment()
-else:
-    render_queue()
-    st.caption("Refresh the page to update generation status on this Streamlit version.")
-
-st.markdown("---")
-st.caption(
-    "Furniture preservation is strict. Room styling is intentionally flexible. "
-    "The queue runs one image request at a time to avoid the previous overload/stalling problem."
-)
+show_jobs()
